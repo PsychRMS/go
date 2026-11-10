@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>KSU Psychiatry Residency</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f7f9; --fg: #1b2733; --muted: #5b6875; --card: #ffffff; --line: #d9dee4; --accent: #1f5f8b; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14181d; --fg: #e8ecf0; --muted: #a3adb8; --card: #1d232a; --line: #2e3640; --accent: #7fb6dd; } }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 32rem; margin: 12vh auto 0; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; }
+  h1 { font-size: 1.15rem; margin: 0 0 8px; }
+  p { margin: 8px 0; color: var(--muted); }
+  button { margin-top: 12px; font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--card); cursor: pointer; }
+  [hidden] { display: none !important; }
+  footer { margin-top: 16px; font-size: .85rem; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1 id="title">Opening the residency program page…</h1>
+    <p id="msg">This should take a moment.</p>
+    <button id="open" type="button" hidden>Open the page</button>
+    <noscript><p>This page needs JavaScript to open your link. Please turn JavaScript on and open the link from the email again, or reply to the program's email for help.</p></noscript>
+  </div>
+  <footer>Psychiatry Residency Program, King Saud University Medical City</footer>
+</main>
+<script>
+(function () {
+  'use strict';
+  // The Program Director fills this in once (README.md): the …/exec address of the evaluator "Anyone" deployment.
+  var TARGET = 'https://script.google.com/macros/s/AKfycbxPILP_-Vzjigyar945i2pBW4pMSGDY-076uI_0utKiWPmJZRjHKRfPEcjCY9RXpQTh/exec';
+
+  // Only these parameters are forwarded; each value must match its pattern exactly.
+  var RULES = {
+    e: /^[A-Za-z0-9_-]{20,128}$/,     // evaluator link token
+    fb: /^[A-Za-z0-9_-]{20,128}$/,    // resident feedback link token
+    stop: /^1$/,                      // "Don't remind me" (only with fb)
+    doc: /^[A-Za-z0-9_-]{1,64}$/      // document link (reserved)
+  };
+  var ORDER = ['e', 'fb', 'stop', 'doc'];
+
+  /**
+   * The forwarding URL, or '' when the link is not valid. Links are https://go.psychresidency.org/#e=… (a fragment never
+   * reaches the web server); a ?query is accepted too, with the same checks. Both at once is refused.
+   */
+  function decide(hash, search, target) {
+    if (!/^https:\/\/script\.google\.com\/(?:a\/macros\/[a-z0-9.-]+\/|macros\/)s\/[A-Za-z0-9_-]{10,}\/exec$/.test(target)) return '';   // not filled in yet
+    if (target.indexOf('REPLACE_WITH') >= 0) return '';
+    var h = String(hash || '').replace(/^#/, ''), q0 = String(search || '').replace(/^\?/, '');
+    if (h && q0) return '';
+    var s = h || q0;
+    if (!s || s.length > 400) return '';
+    var got = {}, parts = s.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split('=');
+      if (kv.length !== 2) return '';
+      var k = kv[0], v = kv[1];
+      if (!Object.prototype.hasOwnProperty.call(RULES, k) || Object.prototype.hasOwnProperty.call(got, k)) return '';
+      if (!RULES[k].test(v)) return '';
+      got[k] = v;
+    }
+    var main = ('e' in got ? 1 : 0) + ('fb' in got ? 1 : 0) + ('doc' in got ? 1 : 0);
+    if (main !== 1) return '';
+    if ('stop' in got && !('fb' in got)) return '';
+    var q = [];
+    for (var j = 0; j < ORDER.length; j++) if (ORDER[j] in got) q.push(ORDER[j] + '=' + got[ORDER[j]]);
+    return target + '?' + q.join('&');
+  }
+
+  function show(title, msg) {
+    document.getElementById('title').textContent = title;
+    document.getElementById('msg').textContent = msg;
+  }
+
+  var url = decide(location.hash, location.search, TARGET);
+  if (!url) {
+    show('This link does not work', 'Please open the most recent email from the residency program and use the link in it, or reply to that email for help.');
+    return;
+  }
+  var btn = document.getElementById('open');
+  btn.addEventListener('click', function () { location.replace(url); });
+  setTimeout(function () { btn.hidden = false; show('Opening the residency program page…', 'If nothing happens, press the button below.'); }, 2500);
+  location.replace(url);
+})();
+</script>
+</body>
+</html>
