@@ -62,6 +62,41 @@ the own domain. Links already sent keep working (they point to the old address, 
 
 To undo: delete the Script Property `RMS_LINK_BASE`; links go back to the `script.google.com` address at once.
 
+## Attendance links: sign-in and conductor (dev.53)
+
+The app can also make the attendance links short: the resident sign-in link `https://go.psychresidency.org/#s=MMR947`
+(forwarded to `<sign-in app>/exec?code=MMR947`) and the conductor link `https://go.psychresidency.org/#c=<32-character key>`
+(forwarded to `<sign-in app>/exec?view=conductor&k=<key>`). The QR code and the WhatsApp text carry the same short link.
+These go to the **attendance sign-in web app** (the old attendance app; its address is the Script Property
+`RMS_SIGNIN_URL` of the Production project), not to the evaluator page, so the page has a second address, `SIGNIN_TARGET`.
+Only a session code of 3–20 capital letters or digits (`s`) or a 32-character lower-case hex key (`c`) is forwarded, each
+alone; anything else shows "This link does not work". While `SIGNIN_TARGET` still says `PASTE_LEGACY_EXEC_URL` the page
+shows "This link is not configured yet" for these links and forwards nothing.
+
+To switch the attendance links over (PD or system@, once; the evaluator part above must already work):
+
+1. Copy the value of the Script Property `RMS_SIGNIN_URL` (Production project → **Project Settings** → **Script
+   Properties**). It ends in `/exec`.
+2. In the `go` repository on GitHub open `index.html` → pencil (**Edit**) → find
+   `var SIGNIN_TARGET = 'PASTE_LEGACY_EXEC_URL';` and put the copied address between the quotes. Change nothing else →
+   **Commit changes** to `main`. GitHub Pages publishes it within a few minutes.
+3. Check: open `https://go.psychresidency.org/#s=` followed by the code of today's session — the sign-in page for that
+   session should open.
+4. Only then add the Script Property `RMS_LINK_SIGNIN_READY` = `TRUE` in the Production project. From now on new sign-in
+   and conductor links (copied, WhatsApp, QR, the "Attendance Link" cell of new sessions) are short. Without it — or without
+   `RMS_LINK_BASE` — the app keeps making the direct `…/exec?code=` links, so residents never get a short link the page
+   cannot open. Links already shared keep working either way.
+
+If the sign-in app gets a new deployment (a new `/exec` address): first update `RMS_SIGNIN_URL`, then `SIGNIN_TARGET` here
+(step 2). To undo: delete `RMS_LINK_SIGNIN_READY`.
+
+## Updating this page in the `go` repository
+
+Every change to `index.html` in the app's source (`v2/go/index.html`) must be copied to the `go` repository by hand:
+GitHub → `PsychRMS/go` → `index.html` → **Edit** → paste the new file, then put back the two addresses (`TARGET` and
+`SIGNIN_TARGET`) from the old version before you commit. A file with a placeholder still in it shows "not configured"
+for that kind of link instead of forwarding.
+
 ## If the evaluator deployment changes
 
 A **new** deployment has a new `/exec` address: update `TARGET` in `index.html` in the `go` repository (edit the file on
