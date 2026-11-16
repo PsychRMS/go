@@ -45,12 +45,13 @@
     fb: /^[A-Za-z0-9_-]{20,128}$/,    // resident feedback link token
     stop: /^1$/,                      // "Don't remind me" (only with fb)
     mt: /^[A-Za-z0-9_-]{20,128}$/,    // mentorship page link token (dev.51)
+    pg: /^[A-Za-z0-9_-]{20,128}$/,
     doc: /^[A-Za-z0-9_-]{1,64}$/,     // document link (reserved)
     af: /^ACS-\d{5,8}\.[A-Za-z0-9_-]{43}$/,  // academic session rating link (s51)
     s: /^[A-Z0-9]{3,20}$/,             // attendance sign-in: session code (dev.53) -> SIGNIN_TARGET?code=CODE
     c: /^[a-f0-9]{32}$/                // attendance conductor view key (dev.53) -> SIGNIN_TARGET?view=conductor&k=key
   };
-  var ORDER = ['e', 'fb', 'stop', 'doc', 'mt', 'af'];
+  var ORDER = ['e', 'fb', 'stop', 'doc', 'mt', 'pg', 'af'];
   var EXEC = /^https:\/\/script\.google\.com\/(?:a\/macros\/[a-z0-9.-]+\/|macros\/)s\/[A-Za-z0-9_-]{10,}\/exec$/;
   var UNCONFIGURED = 'UNCONFIGURED';
 
@@ -72,7 +73,7 @@
       if (!RULES[k].test(v)) return '';
       got[k] = v;
     }
-    var main = ('e' in got ? 1 : 0) + ('fb' in got ? 1 : 0) + ('doc' in got ? 1 : 0) + ('mt' in got ? 1 : 0) + ('af' in got ? 1 : 0) + ('s' in got ? 1 : 0) + ('c' in got ? 1 : 0);
+    var main = ('e' in got ? 1 : 0) + ('fb' in got ? 1 : 0) + ('doc' in got ? 1 : 0) + ('mt' in got ? 1 : 0) + ('pg' in got ? 1 : 0) + ('af' in got ? 1 : 0) + ('s' in got ? 1 : 0) + ('c' in got ? 1 : 0);
     if (main !== 1) return '';
     if ('stop' in got && !('fb' in got)) return '';
     if ('s' in got || 'c' in got) {   // dev.53: the attendance sign-in app
