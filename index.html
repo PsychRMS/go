@@ -38,6 +38,9 @@
   // dev.53: the …/exec address of the attendance sign-in web app (the old attendance app, Script Property RMS_SIGNIN_URL).
   // Resident sign-in links (#s=CODE) and conductor links (#c=key) go there. Filled in once (README.md).
   var SIGNIN_TARGET = 'https://script.google.com/macros/s/AKfycbyptvLaVdPzX0KQc7ZmbqBQ6HYJgqPf4BAaKy9ek-txbbIDLB6NdDkumu7wich_OKWm/exec';
+  // dev.89: the …/exec address of the ADMIN app (staff only; Script Property RMS_ADMIN_URL). Links into one admin screen
+  // (#a=<screen>) go there, e.g. from the Program Director's digest. Signing in is still required.
+  var ADMIN_TARGET = 'https://script.google.com/macros/s/AKfycbwgiTNJsHsdm4B_2GqUkZTs1TA0tFjJ8vJtep10kHi8x8d43yfgfbcndIbFFx-dg8TP/exec';
 
   // Only these parameters are forwarded; each value must match its pattern exactly.
   var RULES = {
@@ -51,7 +54,8 @@
     af: /^ACS-\d{5,8}\.[A-Za-z0-9_-]{43}$/,  // academic session rating link (s51)
     hub: /^[A-Za-z0-9_-]{43}$/,       // the Program links page (dev.86)
     s: /^[A-Z0-9]{3,20}$/,             // attendance sign-in: session code (dev.53) -> SIGNIN_TARGET?code=CODE
-    c: /^[a-f0-9]{32}$/                // attendance conductor view key (dev.53) -> SIGNIN_TARGET?view=conductor&k=key
+    c: /^[a-f0-9]{32}$/,               // attendance conductor view key (dev.53) -> SIGNIN_TARGET?view=conductor&k=key
+    a: /^_?[A-Za-z][A-Za-z0-9_]{1,40}$/  // one admin-app screen (dev.89) -> ADMIN_TARGET?view=<screen>
   };
   var ORDER = ['e', 'fb', 'stop', 'doc', 'mt', 'pg', 'lv', 'af', 'hub'];
   var EXEC = /^https:\/\/script\.google\.com\/(?:a\/macros\/[a-z0-9.-]+\/|macros\/)s\/[A-Za-z0-9_-]{10,}\/exec$/;
@@ -61,7 +65,7 @@
    * The forwarding URL, or '' when the link is not valid. Links are https://go.psychresidency.org/#e=… (a fragment never
    * reaches the web server); a ?query is accepted too, with the same checks. Both at once is refused.
    */
-  function decide(hash, search, target, signinTarget) {
+  function decide(hash, search, target, signinTarget, adminTarget) {
     var h = String(hash || '').replace(/^#/, ''), q0 = String(search || '').replace(/^\?/, '');
     if (h && q0) return '';
     var s = h || q0;
@@ -75,12 +79,16 @@
       if (!RULES[k].test(v)) return '';
       got[k] = v;
     }
-    var main = ('e' in got ? 1 : 0) + ('fb' in got ? 1 : 0) + ('doc' in got ? 1 : 0) + ('mt' in got ? 1 : 0) + ('pg' in got ? 1 : 0) + ('lv' in got ? 1 : 0) + ('af' in got ? 1 : 0) + ('hub' in got ? 1 : 0) + ('s' in got ? 1 : 0) + ('c' in got ? 1 : 0);
+    var main = ('e' in got ? 1 : 0) + ('fb' in got ? 1 : 0) + ('doc' in got ? 1 : 0) + ('mt' in got ? 1 : 0) + ('pg' in got ? 1 : 0) + ('lv' in got ? 1 : 0) + ('af' in got ? 1 : 0) + ('hub' in got ? 1 : 0) + ('s' in got ? 1 : 0) + ('c' in got ? 1 : 0) + ('a' in got ? 1 : 0);
     if (main !== 1) return '';
     if ('stop' in got && !('fb' in got)) return '';
     if ('s' in got || 'c' in got) {   // dev.53: the attendance sign-in app
       if (!EXEC.test(signinTarget) || signinTarget.indexOf('PASTE_') >= 0) return UNCONFIGURED;
       return 's' in got ? signinTarget + '?code=' + got.s : signinTarget + '?view=conductor&k=' + got.c;
+    }
+    if ('a' in got) {   // dev.89: the admin app (staff)
+      if (!EXEC.test(String(adminTarget || '')) || String(adminTarget).indexOf('PASTE_') >= 0) return UNCONFIGURED;
+      return adminTarget + '?view=' + got.a;
     }
     if (!EXEC.test(target) || target.indexOf('REPLACE_WITH') >= 0) return UNCONFIGURED;   // not filled in yet
     var q = [];
@@ -88,12 +96,33 @@
     return target + '?' + q.join('&');
   }
 
+  /**
+   * dev.89 (legacy v4.5.1): this page is a first-party page, so what it keeps survives where the sign-in page cannot keep
+   * anything (Google runs that page in a third-party frame: on an iPhone its storage is wiped with the browsing session).
+   * For a sign-in link (#s=) it keeps one random device ID per browser and passes it on as &dv=…; the sign-in page uses it only
+   * when its own switch (DEVICE_ID_PERSIST) is on and the phone keeps no ID of its own, and takes it off the address bar. Nothing else is stored; the ID is not linked to a person here.
+   */
+  function deviceId(win) {
+    var k = 'RMS_DEVICE_ID_V1', re = /^[A-Za-z0-9]{20}$/, st = null, v = '';
+    try { st = win.localStorage; v = st.getItem(k) || ''; } catch (e) { st = null; v = ''; }
+    if (re.test(v)) return v;
+    try {
+      var a = new Uint8Array(15), abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      win.crypto.getRandomValues(a);
+      v = ''; for (var i = 0; i < 15; i++) v += abc.charAt(a[i] % 62);
+      v = (v + Date.now().toString(36)).slice(0, 20);
+    } catch (e) { return ''; }
+    if (!re.test(v)) return '';
+    try { if (st) st.setItem(k, v); } catch (e) { /* private mode: the ID lives for this visit only */ }
+    return v;
+  }
+
   function show(title, msg) {
     document.getElementById('title').textContent = title;
     document.getElementById('msg').textContent = msg;
   }
 
-  var url = decide(location.hash, location.search, TARGET, SIGNIN_TARGET);
+  var url = decide(location.hash, location.search, TARGET, SIGNIN_TARGET, ADMIN_TARGET);
   if (url === UNCONFIGURED) {
     show('This link is not configured yet', 'The program\u2019s link page has not been set up for this kind of link. Please tell the residency program office.');
     return;
@@ -102,6 +131,7 @@
     show('This link does not work', 'Please open the most recent email from the residency program and use the link in it, or reply to that email for help.');
     return;
   }
+  if (url.indexOf(SIGNIN_TARGET + '?code=') === 0) { var dv = deviceId(typeof window !== 'undefined' ? window : self); if (dv) url += '&dv=' + dv; }   // dev.89
   var btn = document.getElementById('open');
   btn.addEventListener('click', function () { location.replace(url); });
   setTimeout(function () { btn.hidden = false; show('Opening the residency program page…', 'If nothing happens, press the button below.'); }, 2500);
